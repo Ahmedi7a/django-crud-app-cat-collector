@@ -1,23 +1,12 @@
 # controller
 
-from django.shortcuts import render
-from .models import Cat
+from django.shortcuts import render, redirect
+from .models import Cat, Toy
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
-# # fake data to check
-# class Cat:
-#     def __init__(self, name, breed, description, age):
-#         self.name = name
-#         self.breed = breed
-#         self.description = description
-#         self.age = age
+from .forms import FeedingForm
+# ---- toy----
+from django.views.generic import ListView, DetailView
 
-# # Create a list of Cat instances
-# cats = [
-#     Cat('Lolo', 'tabby', 'Kinda rude.', 3),
-#     Cat('Sachi', 'tortoiseshell', 'Looks like a turtle.', 0),
-#     Cat('Fancy', 'bombay', 'Happy fluff ball.', 4),
-#     Cat('Bonk', 'selkirk rex', 'Meows loudly.', 6)
-# ]
 
 # Define the home view function, we use the name in navigation
 def home(request):
@@ -32,7 +21,12 @@ def cat_index(request):
 
 def cat_detail(request, cat_id):
     cat = Cat.objects.get(id=cat_id)
-    return render(request, 'cats/detail.html', {'cat': cat})
+    # instantiate FeedingForm to be rendered in the template
+    feeding_form = FeedingForm()
+    return render(request, 'cats/detail.html', {
+        # include the cat and feeding_form in the context
+        'cat': cat, 'feeding_form': feeding_form
+    })
 
 # beacuse we did this we need to make a folder for it in temp
 class CatCreate(CreateView):
@@ -47,3 +41,36 @@ class CatUpdate(UpdateView):
 class CatDelete(DeleteView):
     model = Cat
     success_url = '/cats/'    
+    
+# ==============================================================
+def add_feeding(request, cat_id):
+    # create a ModelForm instance using the data in request.POST
+    form = FeedingForm(request.POST)
+    # validate the form
+    if form.is_valid():
+        # don't save the form to the db until it
+        # has the cat_id assigned
+        new_feeding = form.save(commit=False)
+        new_feeding.cat_id = cat_id
+        new_feeding.save()
+    return redirect('cat-detail', cat_id=cat_id)  
+  
+# =================================================================================
+# 3 model
+class ToyCreate(CreateView):
+    model = Toy
+    fields = '__all__'
+
+class ToyList(ListView):
+    model = Toy
+
+class ToyDetail(DetailView):
+    model = Toy
+
+class ToyUpdate(UpdateView):
+    model = Toy
+    fields = ['name', 'color']
+
+class ToyDelete(DeleteView):
+    model = Toy
+    success_url = '/toys/'        
