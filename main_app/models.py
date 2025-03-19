@@ -1,6 +1,9 @@
 # Create your models here.
 from django.db import models
 from django.urls import reverse
+from datetime import date
+# Import the User
+from django.contrib.auth.models import User
 
 MEALS = (
     ('B', 'Breakfast'),
@@ -25,6 +28,9 @@ class Cat(models.Model):
     breed = models.CharField(max_length=100)
     description = models.TextField(max_length=250)
     age = models.IntegerField()
+    # Add the M:M relationship
+    toys = models.ManyToManyField(Toy)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     
     # this when you try it in the shell it will only show the name
     def __str__(self):

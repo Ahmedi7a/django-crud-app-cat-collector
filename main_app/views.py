@@ -6,32 +6,54 @@ from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from .forms import FeedingForm
 # ---- toy----
 from django.views.generic import ListView, DetailView
-
+# ======
+from django.contrib.auth.views import LoginView
+from django.contrib.auth import login
+from django.contrib.auth.forms import UserCreationForm
+# Import the login_required decorator
+from django.contrib.auth.decorators import login_required
 
 # Define the home view function, we use the name in navigation
-def home(request):
-    return render(request, 'home.html')
+# Import the mixin for class-based views
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+class Home(LoginView):
+    template_name = 'home.html'
 
 def about(request):
     return render(request, 'about.html')
 
+@login_required
 def cat_index(request):
-    cats = Cat.objects.all()  # look familiar?
-    return render(request, 'cats/index.html', {'cats': cats})
+    cats = Cat.objects.filter(user=request.user)
+    # You could also retrieve the logged in user's cats like this
+    # cats = request.user.cat_set.all()
+    return render(request, 'cats/index.html', { 'cats': cats })
 
 def cat_detail(request, cat_id):
     cat = Cat.objects.get(id=cat_id)
-    # instantiate FeedingForm to be rendered in the template
+
+    # Only get the toys the cat does not have
+    toys_cat_doesnt_have = Toy.objects.exclude(id__in = cat.toys.all().values_list('id'))
+
     feeding_form = FeedingForm()
     return render(request, 'cats/detail.html', {
-        # include the cat and feeding_form in the context
-        'cat': cat, 'feeding_form': feeding_form
+        'cat': cat,
+        'feeding_form': feeding_form,
+        'toys': toys_cat_doesnt_have  # send those toys
     })
 
 # beacuse we did this we need to make a folder for it in temp
-class CatCreate(CreateView):
+class CatCreate(LoginRequiredMixin, CreateView):
     model = Cat
-    fields = '__all__'
+    fields = ['name', 'breed', 'description', 'age']
+     # This inherited method is called when a
+    # valid cat form is being submitted
+    def form_valid(self, form):
+        # Assign the logged in user (self.request.user)
+        form.instance.user = self.request.user  # form.instance is the cat
+        # Let the CreateView do its job as usual
+        return super().form_valid(form)
     
 class CatUpdate(UpdateView):
     model = Cat
@@ -73,4 +95,34 @@ class ToyUpdate(UpdateView):
 
 class ToyDelete(DeleteView):
     model = Toy
-    success_url = '/toys/'        
+    success_url = '/toys/'   
+
+def associate_toy(request, cat_id, toy_id):
+    # Note that you can pass a toy's id instead of the whole object
+    Cat.objects.get(id=cat_id).toys.add(toy_id)
+    return redirect('cat-detail', cat_id=cat_id)  
+
+def signup(request):
+    error_message = ''
+    if request.method == 'POST':
+        # This is how to create a 'user' form object
+        # that includes the data from the browser
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            # This will add the user to the database
+            user = form.save()
+            # This is how we log a user in
+            login(request, user)
+            return redirect('cat-index')
+        else:
+            error_message = 'Invalid sign up - try again'
+    # A bad POST or a GET request, so render signup.html with an empty form
+    form = UserCreationForm()
+    context = {'form': form, 'error_message': error_message}
+    return render(request, 'signup.html', context)
+    # Same as: 
+    # return render(
+    #     request, 
+    #     'signup.html',
+    #     {'form': form, 'error_message': error_message}
+    # )   
